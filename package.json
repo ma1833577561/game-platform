@@ -1,0 +1,46 @@
+{
+  "name": "game-platform",
+  "version": "1.0.0",
+  "description": "8 款纯前端单机游戏大厅：五子棋 / 象棋 / 围棋 / 斗地主 / 蜘蛛纸牌 / 扫雷 / 2048 / 合成西瓜。Vue 3 + TypeScript + Vite，零后端、可离线。",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "type-check": "vue-tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "pinia": "^2.1.7",
+    "vue": "^3.4.0",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.2",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0",
+    "vue-tsc": "^3.3.14"
+  },
+  "license": "MIT",
+  "author": "马金栋",
+  "homepage": "https://game.extra9705.top",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ma1833577561/game-platform.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ma1833577561/game-platform/issues"
+  },
+  "keywords": [
+    "vue3",
+    "typescript",
+    "vite",
+    "games",
+    "offline",
+    "canvas",
+    "pwa"
+  ]
+}

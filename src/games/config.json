@@ -1,0 +1,77 @@
+{
+  "version": "1.0.0",
+  "games": [
+    {
+      "id": "fruit",
+      "name": "合成西瓜",
+      "icon": "🍉",
+      "description": "把水果一颗颗放下，同类碰撞合成更大的水果，向大西瓜出发。",
+      "category": "休闲",
+      "minPlayers": 1,
+      "maxPlayers": 1
+    },
+    {
+      "id": "spider",
+      "name": "蜘蛛纸牌",
+      "icon": "🕷️",
+      "description": "10 列、104 张牌的经典蜘蛛纸牌，三档难度，收齐 8 组同花顺通关。",
+      "category": "纸牌",
+      "minPlayers": 1,
+      "maxPlayers": 1
+    },
+    {
+      "id": "gomoku",
+      "name": "五子棋",
+      "icon": "⚫",
+      "description": "经典五子棋，黑白双方轮流落子，先连成五子者获胜。",
+      "category": "策略",
+      "minPlayers": 2,
+      "maxPlayers": 2
+    },
+    {
+      "id": "xiangqi",
+      "name": "中国象棋",
+      "icon": "♟️",
+      "description": "传统中国象棋，红黑双方对弈，将死对方或困毙获胜。",
+      "category": "策略",
+      "minPlayers": 2,
+      "maxPlayers": 2
+    },
+    {
+      "id": "weiqi",
+      "name": "围棋",
+      "icon": "⚪",
+      "description": "古老围棋，黑白交替落子，数子法计算胜负。",
+      "category": "策略",
+      "minPlayers": 2,
+      "maxPlayers": 2
+    },
+    {
+      "id": "minesweeper",
+      "name": "扫雷",
+      "icon": "💣",
+      "description": "经典扫雷，翻开格子避开地雷，标记所有地雷获胜。",
+      "category": "益智",
+      "minPlayers": 1,
+      "maxPlayers": 1
+    },
+    {
+      "id": "mahjong-match",
+      "name": "麻将对对碰",
+      "icon": "🀄",
+      "description": "休闲麻将消除，点击相同的牌配对消除，连击得分。",
+      "category": "休闲",
+      "minPlayers": 1,
+      "maxPlayers": 1
+    },
+    {
+      "id": "doudizhu",
+      "name": "三人斗地主",
+      "icon": "🃏",
+      "description": "经典三人斗地主，抢地主、出牌、倍数翻番。",
+      "category": "扑克",
+      "minPlayers": 3,
+      "maxPlayers": 3
+    }
+  ]
+}

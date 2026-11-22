@@ -1,0 +1,1168 @@
+<template>
+  <div class="doudizhu-game">
+    <!-- 游戏信息栏 -->
+    <div class="game-info">
+      <div class="info-item">
+        <span class="info-label">局数</span>
+        <span class="info-value">{{ currentRound }}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">底分</span>
+        <span class="info-value">{{ baseScore }}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">倍数</span>
+        <span class="info-value">{{ multiplier }}</span>
+      </div>
+    </div>
+
+    <!-- 游戏设置 -->
+    <div class="game-settings">
+      <span class="mode-badge">经典模式</span>
+    </div>
+
+    <!-- 游戏面板 -->
+    <div class="board-container">
+      <!-- 对手1 (顶部 - 农民) -->
+      <div class="opponent opponent-top">
+        <div class="player-info">
+          <div class="player-name">对手1</div>
+          <div class="player-role" :class="{ farmer: players[1].role === 'farmer', landlord: players[1].role === 'landlord' }">
+            {{ players[1].role === 'landlord' ? '地主' : '农民' }}
+          </div>
+        </div>
+        <div class="opponent-cards">
+          <div class="card-back" v-for="i in players[1].handCards.length" :key="i"></div>
+        </div>
+        <div class="card-count">{{ players[1].handCards.length }} 张</div>
+      </div>
+
+      <!-- 对手2 (左侧 - 地主/农民) -->
+      <div class="opponent opponent-left">
+        <div class="player-info">
+          <div class="player-name">对手2</div>
+          <div class="player-role" :class="{ farmer: players[2].role === 'farmer', landlord: players[2].role === 'landlord' }">
+            {{ players[2].role === 'landlord' ? '地主' : '农民' }}
+          </div>
+        </div>
+        <div class="opponent-cards-vertical">
+          <div class="card-back-vertical" v-for="i in players[2].handCards.length" :key="i"></div>
+        </div>
+        <div class="card-count">{{ players[2].handCards.length }} 张</div>
+      </div>
+
+      <!-- 中间区域 (出牌区和底牌) -->
+      <div class="center-area">
+        <!-- 底牌区域 -->
+        <div class="bottom-cards-area" v-if="gameState === 'bidding' || gameState === 'playing'">
+          <div class="bottom-cards-title">底牌</div>
+          <div class="bottom-cards">
+            <div class="bottom-card" :class="{ revealed: gameState === 'playing' }" v-for="(card, index) in bottomCards" :key="index">
+              {{ gameState === 'playing' ? getCardDisplay(card) : '?' }}
+            </div>
+          </div>
+        </div>
+
+        <!-- 出牌区域 -->
+        <div class="play-area">
+          <div class="played-cards" v-if="lastPlayedCards.length > 0">
+            <div 
+              class="played-card" 
+              v-for="(card, index) in lastPlayedCards" 
+              :key="index"
+              :style="{ transform: `translateX(${index * 10}px)` }"
+            >
+              {{ getCardDisplay(card) }}
+            </div>
+          </div>
+          <div class="pass-indicator" v-if="lastAction === 'pass'">
+            不出
+          </div>
+        </div>
+
+        <!-- 游戏消息 -->
+        <div class="game-message" v-if="message">
+          {{ message }}
+        </div>
+      </div>
+
+      <!-- 玩家区域 (底部) -->
+      <div class="player-area">
+        <div class="player-info">
+          <div class="player-name">我</div>
+          <div class="player-role" :class="{ farmer: players[0].role === 'farmer', landlord: players[0].role === 'landlord' }">
+            {{ players[0].role === 'landlord' ? '地主' : '农民' }}
+          </div>
+        </div>
+        <div class="player-cards">
+          <div 
+            class="player-card" 
+            v-for="(card, index) in players[0].handCards" 
+            :key="index"
+            :class="{ selected: card.selected }"
+            @click="toggleCardSelection(index)"
+            :style="{ transform: `translateX(${index * 15}px) translateY(${card.selected ? '-20px' : '0px'})` }"
+          >
+            {{ getCardDisplay(card) }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 游戏控制按钮 -->
+    <div class="game-controls">
+      <!-- 抢地主阶段按钮 -->
+      <div class="bidding-controls" v-if="gameState === 'bidding' && currentPlayerIndex === 0">
+        <button class="control-btn btn-pass" @click="passBid">不抢</button>
+        <button class="control-btn btn-bid" @click="bidLandlord">抢地主</button>
+      </div>
+
+      <!-- 出牌阶段按钮 -->
+      <div class="playing-controls" v-if="gameState === 'playing' && currentPlayerIndex === 0">
+        <button class="control-btn btn-pass" @click="passPlay" :disabled="lastPlayedCards.length === 0">不出</button>
+        <button class="control-btn btn-hint" @click="showHint">提示</button>
+        <button class="control-btn btn-play" @click="playCards" :disabled="selectedCards.length === 0">出牌</button>
+      </div>
+
+      <!-- 重新开始按钮 -->
+      <div class="game-over-controls" v-if="gameState === 'ended'">
+        <button class="control-btn btn-restart" @click="restartGame">再来一局</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+
+// ==================== 类型定义 ====================
+
+interface Card {
+  suit: 'spade' | 'heart' | 'club' | 'diamond' | 'joker'
+  rank: number // 3-15 (3-10, J=11, Q=12, K=13, A=14, 2=15), joker: 16(small), 17(big)
+  selected?: boolean
+}
+
+interface Player {
+  id: number
+  name: string
+  handCards: Card[]
+  role: 'landlord' | 'farmer' | null
+}
+
+type CardType = 
+  | 'single'       // 单张
+  | 'pair'         // 对子
+  | 'triple'       // 三张
+  | 'triple_one'   // 三带一
+  | 'triple_pair'  // 三带二
+  | 'straight'     // 顺子
+  | 'pair_straight'// 连对
+  | 'airplane'     // 飞机
+  | 'bomb'         // 炸弹
+  | 'rocket'       // 王炸
+  | 'invalid'      // 无效牌型
+
+interface CardPattern {
+  type: CardType
+  rank: number
+  cards: Card[]
+}
+
+type GameState = 'waiting' | 'bidding' | 'playing' | 'ended'
+
+// ==================== 游戏状态 ====================
+
+const gameState = ref<GameState>('waiting')
+const currentRound = ref(1)
+const baseScore = ref(100)
+const multiplier = ref(1)
+const currentPlayerIndex = ref(0)
+const landlordIndex = ref(-1)
+const bottomCards = ref<Card[]>([])
+const lastPlayedCards = ref<Card[]>([])
+const lastPattern = ref<CardPattern | null>(null)
+const lastAction = ref<'play' | 'pass' | null>(null)
+const lastPlayerIndex = ref(-1)
+const message = ref<string>('')
+
+const players = ref<Player[]>([
+  { id: 0, name: '我', handCards: [], role: null },
+  { id: 1, name: '对手1', handCards: [], role: null },
+  { id: 2, name: '对手2', handCards: [], role: null }
+])
+
+// ==================== 计算属性 ====================
+
+const selectedCards = computed(() => {
+  return players.value[0].handCards.filter(card => card.selected)
+})
+
+// ==================== 扑克牌工具函数 ====================
+
+const createDeck = (): Card[] => {
+  const deck: Card[] = []
+  
+  // 普通牌
+  const suits: ('spade' | 'heart' | 'club' | 'diamond')[] = ['spade', 'heart', 'club', 'diamond']
+  for (let suit of suits) {
+    for (let rank = 3; rank <= 15; rank++) {
+      deck.push({ suit, rank })
+    }
+  }
+  
+  // 大小王
+  deck.push({ suit: 'joker', rank: 16 }) // 小王
+  deck.push({ suit: 'joker', rank: 17 }) // 大王
+  
+  return deck
+}
+
+const shuffleDeck = (deck: Card[]): Card[] => {
+  const shuffled = [...deck]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
+}
+
+const sortCards = (cards: Card[]): Card[] => {
+  return [...cards].sort((a, b) => {
+    if (a.suit === 'joker' && b.suit === 'joker') {
+      return b.rank - a.rank
+    }
+    if (a.suit === 'joker') return 1
+    if (b.suit === 'joker') return -1
+    return b.rank - a.rank
+  })
+}
+
+const getCardDisplay = (card: Card): string => {
+  if (card.suit === 'joker') {
+    return card.rank === 16 ? '🃏' : '👑'
+  }
+  
+  const suitSymbols: Record<typeof card.suit, string> = {
+    spade: '♠',
+    heart: '♥',
+    club: '♣',
+    diamond: '♦'
+  }
+  
+  const rankSymbols: Record<number, string> = {
+    11: 'J',
+    12: 'Q',
+    13: 'K',
+    14: 'A',
+    15: '2'
+  }
+  
+  const rank = card.rank <= 10 ? card.rank.toString() : rankSymbols[card.rank]
+  return suitSymbols[card.suit] + rank
+}
+
+// ==================== 牌型判断 ====================
+
+const getCardPattern = (cards: Card[]): CardPattern => {
+  const sorted = sortCards(cards)
+  const len = sorted.length
+  
+  if (len === 0) {
+    return { type: 'invalid', rank: 0, cards: [] }
+  }
+  
+  // 王炸
+  if (len === 2 && sorted[0].suit === 'joker' && sorted[1].suit === 'joker') {
+    return { type: 'rocket', rank: 17, cards: sorted }
+  }
+  
+  // 炸弹
+  if (len === 4 && sorted.every(c => c.rank === sorted[0].rank)) {
+    return { type: 'bomb', rank: sorted[0].rank, cards: sorted }
+  }
+  
+  // 单张
+  if (len === 1) {
+    return { type: 'single', rank: sorted[0].rank, cards: sorted }
+  }
+  
+  // 对子
+  if (len === 2 && sorted[0].rank === sorted[1].rank) {
+    return { type: 'pair', rank: sorted[0].rank, cards: sorted }
+  }
+  
+  // 三张
+  if (len === 3 && sorted.every(c => c.rank === sorted[0].rank)) {
+    return { type: 'triple', rank: sorted[0].rank, cards: sorted }
+  }
+  
+  // 三带一
+  if (len === 4) {
+    const ranks = sorted.map(c => c.rank)
+    const rankCount: Record<number, number> = {}
+    ranks.forEach(r => rankCount[r] = (rankCount[r] || 0) + 1)
+    
+    for (let rank in rankCount) {
+      if (rankCount[rank] === 3) {
+        return { type: 'triple_one', rank: parseInt(rank), cards: sorted }
+      }
+    }
+  }
+  
+  // 三带二
+  if (len === 5) {
+    const ranks = sorted.map(c => c.rank)
+    const rankCount: Record<number, number> = {}
+    ranks.forEach(r => rankCount[r] = (rankCount[r] || 0) + 1)
+    
+    const counts = Object.values(rankCount).sort((a, b) => b - a)
+    if (counts[0] === 3 && counts[1] === 2) {
+      const tripleRank = parseInt(Object.keys(rankCount).find(k => rankCount[k] === 3)!)
+      return { type: 'triple_pair', rank: tripleRank, cards: sorted }
+    }
+  }
+  
+  // 顺子 (至少5张)
+  if (len >= 5) {
+    const ranks = sorted.map(c => c.rank)
+    const isConsecutive = ranks.every((r, i) => i === 0 || ranks[i-1] - r === 1)
+    const noJoker = !sorted.some(c => c.suit === 'joker')
+    const maxRank = Math.max(...ranks)
+    
+    if (isConsecutive && noJoker && maxRank < 15) { // 不能包含2和王
+      return { type: 'straight', rank: maxRank, cards: sorted }
+    }
+  }
+  
+  // 连对 (至少3对)
+  if (len >= 6 && len % 2 === 0) {
+    const ranks = sorted.map(c => c.rank)
+    const pairs: number[] = []
+    
+    for (let i = 0; i < len; i += 2) {
+      if (ranks[i] !== ranks[i+1]) break
+      pairs.push(ranks[i])
+    }
+    
+    if (pairs.length === len / 2) {
+      const isConsecutive = pairs.every((r, i) => i === 0 || pairs[i-1] - r === 1)
+      const maxRank = Math.max(...pairs)
+      
+      if (isConsecutive && maxRank < 15) {
+        return { type: 'pair_straight', rank: maxRank, cards: sorted }
+      }
+    }
+  }
+  
+  return { type: 'invalid', rank: 0, cards: [] }
+}
+
+const canBeat = (pattern: CardPattern, lastPattern: CardPattern): boolean => {
+  // 王炸最大
+  if (pattern.type === 'rocket') return true
+  if (lastPattern.type === 'rocket') return false
+  
+  // 炸弹可以打非炸弹
+  if (pattern.type === 'bomb' && lastPattern.type !== 'bomb') return true
+  if (pattern.type !== 'bomb' && lastPattern.type === 'bomb') return false
+  
+  // 同类型比较
+  if (pattern.type === lastPattern.type) {
+    if (pattern.type === 'straight' || pattern.type === 'pair_straight') {
+      return pattern.cards.length === lastPattern.cards.length && pattern.rank > lastPattern.rank
+    }
+    return pattern.rank > lastPattern.rank
+  }
+  
+  return false
+}
+
+// ==================== 游戏逻辑 ====================
+
+const startGame = () => {
+  gameState.value = 'bidding'
+  message.value = ''
+  lastPlayedCards.value = []
+  lastPattern.value = null
+  lastAction.value = null
+  lastPlayerIndex.value = -1
+  multiplier.value = 1
+  
+  // 洗牌发牌
+  const deck = shuffleDeck(createDeck())
+  
+  players.value[0].handCards = sortCards(deck.slice(0, 17))
+  players.value[1].handCards = sortCards(deck.slice(17, 34))
+  players.value[2].handCards = sortCards(deck.slice(34, 51))
+  bottomCards.value = deck.slice(51, 54)
+  
+  // 随机起始玩家
+  currentPlayerIndex.value = Math.floor(Math.random() * 3)
+  
+  // 如果不是玩家先手，AI自动抢地主
+  if (currentPlayerIndex.value !== 0) {
+    setTimeout(() => aiBid(), 1000)
+  }
+}
+
+const bidLandlord = () => {
+  landlordIndex.value = 0
+  players.value[0].role = 'landlord'
+  players.value[1].role = 'farmer'
+  players.value[2].role = 'farmer'
+  
+  // 获得底牌
+  players.value[0].handCards = sortCards([...players.value[0].handCards, ...bottomCards.value])
+  
+  gameState.value = 'playing'
+  currentPlayerIndex.value = 0
+  message.value = '你是地主，先出牌'
+  
+  setTimeout(() => {
+    message.value = ''
+  }, 2000)
+}
+
+const passBid = () => {
+  currentPlayerIndex.value = (currentPlayerIndex.value + 1) % 3
+  
+  if (currentPlayerIndex.value === 0) {
+    // 玩家放弃，AI决定
+    setTimeout(() => aiBid(), 1000)
+  } else {
+    setTimeout(() => aiBid(), 1000)
+  }
+}
+
+const aiBid = () => {
+  const playerIndex = currentPlayerIndex.value
+  const player = players.value[playerIndex]
+  
+  // 简单AI：根据手牌强度决定是否抢地主
+  const cards = player.handCards
+  const hasJoker = cards.some(c => c.suit === 'joker')
+  const hasBomb = checkHasBomb(cards)
+  const highCards = cards.filter(c => c.rank >= 14).length
+  
+  const shouldBid = hasJoker || hasBomb || highCards >= 3
+  
+  if (shouldBid) {
+    landlordIndex.value = playerIndex
+    player.role = 'landlord'
+    
+    // 其他玩家设为农民
+    players.value.forEach((p, i) => {
+      if (i !== playerIndex) p.role = 'farmer'
+    })
+    
+    // 获得底牌
+    player.handCards = sortCards([...player.handCards, ...bottomCards.value])
+    
+    gameState.value = 'playing'
+    message.value = `${player.name} 成为地主`
+    
+    setTimeout(() => {
+      message.value = ''
+      currentPlayerIndex.value = (playerIndex + 1) % 3
+      if (currentPlayerIndex.value !== 0) {
+        setTimeout(() => aiPlay(), 1500)
+      }
+    }, 2000)
+  } else {
+    currentPlayerIndex.value = (playerIndex + 1) % 3
+    
+    if (currentPlayerIndex.value === 0) {
+      message.value = '轮到你抢地主'
+    } else {
+      setTimeout(() => aiBid(), 1000)
+    }
+  }
+}
+
+const checkHasBomb = (cards: Card[]): boolean => {
+  const ranks = cards.map(c => c.rank)
+  const rankCount: Record<number, number> = {}
+  ranks.forEach(r => rankCount[r] = (rankCount[r] || 0) + 1)
+  return Object.values(rankCount).some(count => count === 4)
+}
+
+const toggleCardSelection = (index: number) => {
+  if (gameState.value !== 'playing' || currentPlayerIndex.value !== 0) return
+  
+  players.value[0].handCards[index].selected = !players.value[0].handCards[index].selected
+}
+
+const playCards = () => {
+  if (selectedCards.value.length === 0) return
+  
+  const pattern = getCardPattern(selectedCards.value)
+  
+  if (pattern.type === 'invalid') {
+    message.value = '无效牌型'
+    setTimeout(() => message.value = '', 2000)
+    return
+  }
+  
+  // 检查是否能打过上家
+  if (lastPattern.value && lastPlayerIndex.value !== 0) {
+    if (!canBeat(pattern, lastPattern.value)) {
+      message.value = '打不过上家'
+      setTimeout(() => message.value = '', 2000)
+      return
+    }
+  }
+  
+  // 出牌
+  const playedCards = selectedCards.value
+  players.value[0].handCards = players.value[0].handCards.filter(c => !c.selected)
+  
+  lastPlayedCards.value = playedCards
+  lastPattern.value = pattern
+  lastAction.value = 'play'
+  lastPlayerIndex.value = 0
+  
+  // 炸弹加倍
+  if (pattern.type === 'bomb' || pattern.type === 'rocket') {
+    multiplier.value *= 2
+  }
+  
+  // 检查胜利
+  if (players.value[0].handCards.length === 0) {
+    endGame(0)
+    return
+  }
+  
+  // 下一个玩家
+  currentPlayerIndex.value = 1
+  setTimeout(() => aiPlay(), 1500)
+}
+
+const passPlay = () => {
+  if (lastPlayedCards.value.length === 0) return
+  
+  lastAction.value = 'pass'
+  currentPlayerIndex.value = 1
+  setTimeout(() => aiPlay(), 1500)
+}
+
+const showHint = () => {
+  if (gameState.value !== 'playing' || currentPlayerIndex.value !== 0) return
+  
+  // 清除当前选择
+  players.value[0].handCards.forEach(c => c.selected = false)
+  
+  const handCards = players.value[0].handCards
+  const hintCards = findBestPlay(handCards, lastPattern.value, lastPlayerIndex.value === 0)
+  
+  if (hintCards) {
+    hintCards.forEach(card => {
+      const index = handCards.findIndex(c => c.suit === card.suit && c.rank === card.rank)
+      if (index !== -1 && !handCards[index].selected) {
+        handCards[index].selected = true
+      }
+    })
+  }
+}
+
+const findBestPlay = (cards: Card[], lastPattern: CardPattern | null, isNewRound: boolean): Card[] | null => {
+  const sorted = sortCards(cards)
+  
+  if (isNewRound || !lastPattern) {
+    // 新回合，出最小的单张
+    return [sorted[sorted.length - 1]]
+  }
+  
+  // 尝试找到能打过的牌
+  if (lastPattern.type === 'single') {
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (sorted[i].rank > lastPattern.rank) {
+        return [sorted[i]]
+      }
+    }
+  }
+  
+  if (lastPattern.type === 'pair') {
+    const pairs: Card[][] = []
+    for (let i = 0; i < sorted.length - 1; i++) {
+      if (sorted[i].rank === sorted[i + 1].rank && sorted[i].rank > lastPattern.rank) {
+        pairs.push([sorted[i], sorted[i + 1]])
+        i++
+      }
+    }
+    if (pairs.length > 0) return pairs[0]
+  }
+  
+  if (lastPattern.type === 'triple') {
+    const triples: Card[][] = []
+    for (let i = 0; i < sorted.length - 2; i++) {
+      if (sorted[i].rank === sorted[i + 1].rank && sorted[i].rank === sorted[i + 2].rank) {
+        if (sorted[i].rank > lastPattern.rank) {
+          triples.push([sorted[i], sorted[i + 1], sorted[i + 2]])
+          i += 2
+        }
+      }
+    }
+    if (triples.length > 0) return triples[0]
+  }
+  
+  // 检查炸弹
+  const bombs = findBombs(sorted)
+  if (lastPattern.type !== 'bomb' && lastPattern.type !== 'rocket') {
+    if (bombs.length > 0) return bombs[0]
+  } else if (lastPattern.type === 'bomb') {
+    for (const bomb of bombs) {
+      if (bomb[0].rank > lastPattern.rank) {
+        return bomb
+      }
+    }
+  }
+  
+  // 王炸
+  const jokers = sorted.filter(c => c.suit === 'joker')
+  if (jokers.length === 2 && lastPattern.type !== 'rocket') {
+    return jokers
+  }
+  
+  return null
+}
+
+const findBombs = (cards: Card[]): Card[][] => {
+  const bombs: Card[][] = []
+  const sorted = sortCards(cards)
+  
+  for (let i = 0; i < sorted.length - 3; i++) {
+    if (sorted[i].rank === sorted[i + 1].rank && 
+        sorted[i].rank === sorted[i + 2].rank && 
+        sorted[i].rank === sorted[i + 3].rank) {
+      bombs.push([sorted[i], sorted[i + 1], sorted[i + 2], sorted[i + 3]])
+      i += 3
+    }
+  }
+  
+  return bombs
+}
+
+const aiPlay = () => {
+  const playerIndex = currentPlayerIndex.value
+  const player = players.value[playerIndex]
+  
+  // 检查是否需要出牌
+  const isNewRound = lastPlayerIndex.value === -1 || lastPlayerIndex.value === playerIndex
+  
+  const playedCards = findBestPlay(player.handCards, lastPattern.value, isNewRound)
+  
+  if (playedCards) {
+    // 出牌
+    const pattern = getCardPattern(playedCards)
+    player.handCards = player.handCards.filter(c => 
+      !playedCards.some(pc => pc.suit === c.suit && pc.rank === c.rank)
+    )
+    
+    lastPlayedCards.value = playedCards
+    lastPattern.value = pattern
+    lastAction.value = 'play'
+    lastPlayerIndex.value = playerIndex
+    
+    // 炸弹加倍
+    if (pattern.type === 'bomb' || pattern.type === 'rocket') {
+      multiplier.value *= 2
+    }
+    
+    // 检查胜利
+    if (player.handCards.length === 0) {
+      endGame(playerIndex)
+      return
+    }
+  } else {
+    // 不出
+    lastAction.value = 'pass'
+  }
+  
+  // 下一个玩家
+  currentPlayerIndex.value = (playerIndex + 1) % 3
+  
+  if (currentPlayerIndex.value !== 0) {
+    setTimeout(() => aiPlay(), 1500)
+  }
+}
+
+const endGame = (winnerIndex: number) => {
+  gameState.value = 'ended'
+  const winner = players.value[winnerIndex]
+  const isLandlordWin = winner.role === 'landlord'
+  
+  if (winnerIndex === 0) {
+    message.value = isLandlordWin ? '你赢了！地主胜利' : '你赢了！农民胜利'
+  } else {
+    message.value = isLandlordWin ? '地主胜利' : '农民胜利'
+  }
+}
+
+const restartGame = () => {
+  currentRound.value++
+  players.value.forEach(p => {
+    p.handCards = []
+    p.role = null
+  })
+  startGame()
+}
+
+onMounted(() => {
+  startGame()
+})
+</script>
+
+<style scoped>
+.doudizhu-game {
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+/* 游戏信息栏 */
+.game-info {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.info-label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.info-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #FFD700;
+}
+
+/* 游戏设置 */
+.game-settings {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 20px;
+}
+
+.mode-badge {
+  background: rgba(255, 215, 0, 0.2);
+  color: #FFD700;
+  padding: 5px 15px;
+  border-radius: 15px;
+  font-size: 14px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+/* 游戏面板 */
+.board-container {
+  flex: 1;
+  display: grid;
+  grid-template-rows: 1fr 1.5fr 1.2fr;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 10px;
+  padding: 10px;
+  position: relative;
+}
+
+/* 对手区域 */
+.opponent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.opponent-top {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.opponent-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.player-info {
+  text-align: center;
+}
+
+.player-name {
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.player-role {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.player-role.landlord {
+  background: rgba(255, 215, 0, 0.2);
+  color: #FFD700;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.player-role.farmer {
+  background: rgba(139, 195, 74, 0.2);
+  color: #8BC34A;
+  border: 1px solid rgba(139, 195, 74, 0.3);
+}
+
+/* 对手手牌 */
+.opponent-cards {
+  display: flex;
+  gap: -30px;
+  margin-top: 10px;
+}
+
+.card-back {
+  width: 50px;
+  height: 70px;
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  border: 2px solid #333333;
+  border-radius: 8px;
+  margin-left: -30px;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.card-back:first-child {
+  margin-left: 0;
+}
+
+.opponent-cards-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: -50px;
+  margin-top: 10px;
+}
+
+.card-back-vertical {
+  width: 40px;
+  height: 55px;
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  border: 2px solid #333333;
+  border-radius: 6px;
+  margin-top: -40px;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.card-back-vertical:first-child {
+  margin-top: 0;
+}
+
+.card-count {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+/* 中间区域 */
+.center-area {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+/* 底牌区域 */
+.bottom-cards-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.bottom-cards-title {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+}
+
+.bottom-cards {
+  display: flex;
+  gap: 10px;
+}
+
+.bottom-card {
+  width: 50px;
+  height: 70px;
+  background: #FFFFFF;
+  border: 2px solid #333333;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
+  color: #333333;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.bottom-card:not(.revealed) {
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  color: #FFFFFF;
+}
+
+/* 出牌区域 */
+.play-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(76, 175, 80, 0.2);
+  border-radius: 15px;
+  padding: 20px;
+  min-height: 120px;
+}
+
+.played-cards {
+  display: flex;
+  gap: 10px;
+}
+
+.played-card {
+  width: 50px;
+  height: 70px;
+  background: #FFFFFF;
+  border: 2px solid #333333;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
+  color: #333333;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+  position: relative;
+  transition: transform 0.2s;
+}
+
+.played-card::before {
+  content: attr(data-suit);
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  font-size: 12px;
+}
+
+.pass-indicator {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* 游戏消息 */
+.game-message {
+  background: rgba(255, 215, 0, 0.2);
+  color: #FFD700;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 16px;
+  font-weight: bold;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 玩家区域 */
+.player-area {
+  grid-column: 2;
+  grid-row: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.player-cards {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px;
+}
+
+.player-card {
+  width: 60px;
+  height: 85px;
+  background: #FFFFFF;
+  border: 2px solid #333333;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+  color: #333333;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.player-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.4);
+}
+
+.player-card.selected {
+  transform: translateY(-20px);
+  box-shadow: 3px 3px 15px rgba(255, 215, 0, 0.5);
+  border-color: #FFD700;
+}
+
+/* 花色颜色 */
+.player-card[data-suit="heart"], 
+.player-card[data-suit="diamond"],
+.played-card[data-suit="heart"], 
+.played-card[data-suit="diamond"] {
+  color: #D32F2F;
+}
+
+.player-card[data-suit="spade"], 
+.player-card[data-suit="club"],
+.played-card[data-suit="spade"], 
+.played-card[data-suit="club"] {
+  color: #212121;
+}
+
+.player-card[data-suit="joker"],
+.played-card[data-suit="joker"] {
+  color: #9C27B0;
+}
+
+/* 游戏控制按钮 */
+.game-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  gap: 15px;
+}
+
+.control-btn {
+  padding: 12px 30px;
+  border: none;
+  border-radius: 25px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.control-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+}
+
+.control-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-pass {
+  background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+  color: white;
+}
+
+.btn-bid {
+  background: linear-gradient(135deg, #FFD700 0%, #FFC107 100%);
+  color: #333333;
+}
+
+.btn-hint {
+  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+  color: white;
+}
+
+.btn-play {
+  background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
+  color: white;
+}
+
+.btn-restart {
+  background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
+  color: white;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .game-info {
+    gap: 20px;
+    padding: 10px;
+  }
+  
+  .info-value {
+    font-size: 18px;
+  }
+  
+  .board-container {
+    grid-template-rows: 1fr 1.5fr 1.5fr;
+  }
+  
+  .card-back, .bottom-card, .played-card {
+    width: 40px;
+    height: 55px;
+    font-size: 16px;
+  }
+  
+  .player-card {
+    width: 45px;
+    height: 65px;
+    font-size: 18px;
+  }
+  
+  .control-btn {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+  
+  .opponent-left {
+    display: none;
+  }
+}
+</style>

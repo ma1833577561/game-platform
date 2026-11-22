@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fff7eb">
+  <meta name="description" content="一款可以离线游玩的合成西瓜小游戏。放下水果，碰撞合成，向大西瓜出发！">
+  <title>果物研究所 · 合成西瓜</title>
+  <style>
+    :root{--ink:#303348;--muted:#777d8c;--paper:#fff9ef;--coral:#ed735f;--green:#448d67;--line:#f2deca;--shadow:0 22px 65px rgba(113,75,47,.13)}
+    *{box-sizing:border-box}
+    html{background:#fff7eb}
+    body{margin:0;min-height:100vh;color:var(--ink);font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",system-ui,sans-serif;background:radial-gradient(circle at 3% 8%,#ffe2cf 0,transparent 28%),radial-gradient(circle at 95% 84%,#e7f3d8 0,transparent 29%),#fff7eb}
+    button{font:inherit;cursor:pointer}
+    button:focus-visible,.board:focus-visible{outline:3px solid #4d9c73;outline-offset:3px}
+    .shell{max-width:1170px;margin:auto;padding:24px clamp(18px,5vw,55px) 32px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:39px}
+    .brand{display:flex;align-items:center;gap:11px;text-decoration:none;color:var(--ink);font-weight:850;letter-spacing:.045em;font-size:17px}
+    .brand-mark{width:37px;height:37px;border-radius:12px;background:#f28c72;box-shadow:inset -3px -4px 0 #db705b,0 5px 0 #eac0ac;position:relative;transform:rotate(-7deg)}
+    .brand-mark:before{content:"";position:absolute;width:13px;height:7px;background:#589d6b;border-radius:90% 5% 90% 5%;left:18px;top:-5px;transform:rotate(-25deg)}
+    .brand-mark:after{content:"";position:absolute;width:4px;height:4px;left:11px;top:17px;background:#643e40;border-radius:50%;box-shadow:12px 0 #643e40,6px 8px 0 -1px #643e40}
+    .top-actions{display:flex;align-items:center;gap:9px}
+    .icon-button{height:40px;min-width:40px;display:inline-flex;align-items:center;justify-content:center;border:1.5px solid #ead8c7;border-radius:12px;background:#fffdfa;color:var(--ink);box-shadow:0 3px 0 #f0dfd0;transition:transform .18s,box-shadow .18s}
+    .icon-button:hover{transform:translateY(-2px);box-shadow:0 5px 0 #f0dfd0}
+    .icon-button:active{transform:translateY(2px);box-shadow:none}
+    .icon-button svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .top-label{margin-left:7px;font-size:12px;font-weight:750;color:#718071;letter-spacing:.12em}
+    .layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,442px);gap:clamp(30px,6.5vw,95px);align-items:center}
+    .intro{padding-bottom:65px}
+    .eyebrow{display:inline-flex;align-items:center;gap:9px;color:var(--green);font-size:12px;font-weight:850;letter-spacing:.22em}
+    .eyebrow:before{content:"";width:24px;height:2px;background:currentColor;border-radius:2px}
+    h1{font-size:clamp(46px,5.4vw,76px);line-height:1.2;letter-spacing:-.075em;margin:20px 0 19px;font-weight:900}
+    h1 span{display:block;color:var(--coral);position:relative;width:max-content;max-width:100%}
+    h1 span:after{content:"";position:absolute;left:0;bottom:-5px;height:7px;width:89%;border-radius:50%;background:#ffc685;transform:rotate(-2deg);z-index:-1}
+    .intro-copy{max-width:375px;font-size:15px;line-height:1.95;color:#757a82;margin:0 0 32px}
+    .pill-row{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:44px}
+    .pill{padding:9px 14px;border-radius:999px;background:#fffef9;border:1px solid #eddfcd;color:#67756b;font-size:12px;font-weight:750;box-shadow:0 3px 0 #f2e4d3}
+    .evolution{border-top:1px dashed #e7cdb6;max-width:405px;padding-top:24px}
+    .section-label{font-size:11px;font-weight:850;letter-spacing:.21em;color:#9d988d;margin-bottom:15px}
+    .fruit-list{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+    .evo-fruit{width:35px;height:35px;flex:none;display:grid;place-items:center;border-radius:50%;font-size:11px;font-weight:850;color:#fff;box-shadow:inset -2px -3px 0 rgba(0,0,0,.10),0 3px 0 rgba(91,69,43,.10)}
+    .evo-arrow{font-size:13px;font-weight:900;color:#bcb1a2}
+    .evo-name{font-size:12px;color:#928b81;margin-top:14px;letter-spacing:.025em}
+    .game-column{min-width:0}
+    .game-top{display:flex;align-items:stretch;gap:10px;margin-bottom:13px}
+    .score-box{min-height:75px;flex:1;background:#fffdf9;border:1.5px solid #f0dfcb;border-radius:19px;padding:11px 17px;box-shadow:0 4px 0 #eedfcd}
+    .score-box small,.next-box small{display:block;font-size:10px;font-weight:800;letter-spacing:.16em;color:#a49b90}
+    .score-box strong{display:block;font-size:29px;font-weight:900;letter-spacing:-.055em;line-height:1.2;font-variant-numeric:tabular-nums}
+    .score-box.best strong{color:#e98261}
+    .next-box{width:86px;flex:none;position:relative;background:#eaf4e5;border:1.5px solid #d8e9d0;border-radius:19px;padding:10px 8px;text-align:center;box-shadow:0 4px 0 #dce9d4}
+    #nextCanvas{width:43px;height:43px;display:block;margin:-1px auto -4px}
+    .mission-card{background:#edf5e8;border:1.5px solid #d8e7cf;border-radius:19px;padding:12px 16px 13px;margin-bottom:13px;box-shadow:0 4px 0 #dae8d1}
+    .mission-heading,.mission-main{display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .mission-heading{min-height:20px;margin-bottom:3px}
+    .mission-number{font-size:11px;font-weight:850;letter-spacing:.11em;color:#578564}
+    .mission-main strong{font-size:17px;font-weight:850;letter-spacing:-.04em;color:#344a3a}
+    .mission-main span{font-size:12px;font-weight:700;color:#67806b;text-align:right}
+    .mission-track{height:6px;background:#d7e7ce;border-radius:10px;overflow:hidden;margin-top:10px}
+    .mission-track span{display:block;height:100%;width:0;background:linear-gradient(90deg,#71b77c,#e9ba6a);border-radius:10px;transition:width .45s ease}
+    .combo-badge{display:inline-flex;align-items:center;border-radius:999px;padding:2px 9px;background:#fbe0ce;color:#b35337;font-weight:900;font-size:11px;animation:combo-pop .25s ease-out}
+    .combo-badge[hidden]{display:none}
+    @keyframes combo-pop{from{transform:scale(.75)}to{transform:scale(1)}}
+    .board-wrap{padding:9px;background:#fffdf9;border:2px solid #f2ddc8;border-radius:29px;box-shadow:var(--shadow),0 6px 0 #edd9c3;position:relative}
+    .board{position:relative;overflow:hidden;border-radius:21px;aspect-ratio:420/570;background:radial-gradient(circle at 15% 15%,rgba(255,255,255,.92),transparent 32%),linear-gradient(180deg,#fff5e2 0%,#fff9ee 75%,#fbe9d3 100%);touch-action:none;outline:none;user-select:none}
+    .board:before{content:"";pointer-events:none;position:absolute;inset:0;background-image:radial-gradient(#cda789 1px,transparent 1px);background-size:23px 23px;opacity:.12}
+    #gameCanvas{display:block;position:relative;width:100%;height:100%}
+    .board-corner{position:absolute;left:17px;bottom:13px;color:#c8a98d;font-size:10px;font-weight:800;letter-spacing:.13em;pointer-events:none}
+    .overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(255,249,236,.82);backdrop-filter:blur(6px);padding:22px;text-align:center;z-index:2}
+    .overlay[hidden]{display:none}
+    .overlay-card{max-width:310px}
+    .overlay-art{width:102px;height:102px;margin:0 auto 21px;border-radius:50%;display:grid;place-items:center;background:#d9ebd2;box-shadow:0 7px 0 #bdd8af;position:relative;transform:rotate(-10deg)}
+    .overlay-art:before{content:"";height:65px;width:65px;border:9px solid #4a9c67;border-radius:50%;background:#f17372;box-shadow:inset 0 0 0 5px #f7b7a4;position:absolute}
+    .overlay-art:after{content:"•••";position:absolute;font-size:23px;letter-spacing:4px;line-height:1;color:#684c48;transform:translate(3px,0) rotate(10deg)}
+    .overlay h2{font-size:28px;letter-spacing:-.045em;margin:0 0 8px}
+    .overlay p{font-size:14px;color:#777b7d;line-height:1.8;margin:0 auto 22px;max-width:270px}
+    .primary-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-width:180px;min-height:52px;padding:10px 21px;border:0;border-radius:15px;background:#ed765f;color:#fff;font-weight:850;font-size:16px;box-shadow:0 6px 0 #c85d49;transition:transform .18s,box-shadow .18s,background .18s}
+    .primary-button:hover{background:#dc674f;transform:translateY(-2px);box-shadow:0 8px 0 #c85d49}
+    .primary-button:active{transform:translateY(4px);box-shadow:0 2px 0 #c85d49}
+    .primary-button svg{width:17px;height:17px;fill:currentColor}
+    .game-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 7px 0;font-size:12px;color:#918d84}
+    .footer-tip{display:flex;align-items:center;gap:7px}
+    .footer-tip i{height:8px;width:8px;display:inline-block;border-radius:50%;background:#69b783;box-shadow:0 0 0 4px #e0f0d9}
+    .reset-link{border:0;background:none;font-weight:800;color:#8a8278;text-decoration:underline;text-decoration-color:#cbbdaf;text-underline-offset:4px;min-height:35px;padding:5px 1px}
+    .reset-link:hover{color:#e77461}
+    .screen-reader{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(max-width:790px){.shell{max-width:480px;padding:17px 16px 28px}.topbar{margin-bottom:18px}.top-label{display:none}.layout{display:flex;flex-direction:column;gap:12px}.intro{padding:0;width:100%;display:contents}.eyebrow,.intro-copy,.pill-row,.evolution{display:none}h1{order:-1;align-self:flex-start;width:100%;font-size:clamp(28px,7vw,37px);line-height:1.12;letter-spacing:-.05em;margin:0 0 3px}h1 span{display:inline}h1 span:after{height:5px;bottom:-4px}.game-column{width:100%}.game-top{margin-bottom:10px}.score-box{min-height:66px;padding:8px 14px}.score-box strong{font-size:25px}.next-box{width:76px;padding:6px}#nextCanvas{width:39px;height:39px}.mission-card{padding:9px 13px 10px;margin-bottom:10px}.mission-main strong{font-size:15px}.game-footer{padding-top:12px}}
+    @media(max-width:380px){.shell{padding-left:12px;padding-right:12px}.board-wrap{padding:7px;border-radius:24px}.board{border-radius:17px}.score-box{padding-left:11px;padding-right:8px}.game-top{gap:7px}.game-footer{font-size:11px}}
+    @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span>果物研究所 <span style="font-size:11px;font-weight:750;color:#ad9b8c;letter-spacing:0">/ FRUIT LAB</span></div>
+      <div class="top-actions">
+        <span class="top-label">一点一点，长成大西瓜</span>
+        <button class="icon-button" id="soundButton" aria-label="关闭音效" title="音效开关"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path id="soundWave" d="M17 9a5 5 0 0 1 0 6M19 6a9 9 0 0 1 0 12"/></svg></button>
+        <button class="icon-button" id="pauseButton" aria-label="暂停游戏" title="暂停 / 继续"><svg id="pauseIcon" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button>
+      </div>
+    </header>
+    <main class="layout">
+      <section class="intro" aria-label="游戏介绍">
+        <div class="eyebrow">轻松玩 · 慢慢合成</div>
+        <h1>把快乐，<span>合成大西瓜。</span></h1>
+        <p class="intro-copy">小小水果，从天而降。挑战十关累计积分目标，连击合成赚取加倍分数，向大西瓜出发。别让果园堆过警戒线哦！</p>
+        <div class="pill-row"><span class="pill">✦ 十关挑战</span><span class="pill">✦ 连击加分</span><span class="pill">✦ 离线也能玩</span></div>
+        <div class="evolution"><div class="section-label">FRUIT EVOLUTION / 水果进化论</div><div class="fruit-list"><span class="evo-fruit" style="background:#dd5865">樱</span><span class="evo-arrow">›</span><span class="evo-fruit" style="background:#ef8274">莓</span><span class="evo-arrow">›</span><span class="evo-fruit" style="background:#a386c9">葡</span><span class="evo-arrow">›</span><span class="evo-fruit" style="background:#f7ae5f">橘</span><span class="evo-arrow">›</span><span class="evo-fruit" style="background:#f2c96e">柠</span><span class="evo-arrow">›</span><span class="evo-fruit" style="background:#92b969">猕</span><span class="evo-arrow">›</span><span class="evo-fruit" style="background:#4a9b67">瓜</span></div><div class="evo-name">11 种水果 · 同类碰撞就会长大</div></div>
+      </section>
+      <section class="game-column" aria-label="合成西瓜游戏">
+        <div class="game-top">
+          <div class="score-box"><small>当前得分 / SCORE</small><strong id="score">0</strong></div>
+          <div class="score-box best"><small>最高纪录 / BEST</small><strong id="best">0</strong></div>
+          <div class="next-box"><small>下一个</small><canvas id="nextCanvas" width="86" height="86" aria-label="下一颗水果"></canvas></div>
+        </div>
+        <div class="mission-card" aria-label="当前关卡目标">
+          <div class="mission-heading"><span class="mission-number" id="missionNumber">第 1 / 10 关</span><span class="combo-badge" id="comboBadge" hidden>连击 ×2</span></div>
+          <div class="mission-main"><strong id="missionTitle">果园初体验</strong><span id="missionTarget">目标 · 累计 5,000 分</span></div>
+          <div class="mission-track" aria-hidden="true"><span id="missionFill"></span></div>
+        </div>
+        <div class="board-wrap">
+          <div class="board" id="board" tabindex="0" role="application" aria-label="合成西瓜游戏区域：鼠标或手指移动瞄准，点击或松开投放，方向键调整，空格投放">
+            <canvas id="gameCanvas" width="840" height="1140" aria-hidden="true"></canvas>
+            <span class="board-corner" id="boardCorner">FRUIT LAB · 01</span>
+            <div class="overlay" id="overlay">
+              <div class="overlay-card"><div class="overlay-art" aria-hidden="true"></div><h2 id="overlayTitle">今天，来点甜的。</h2><p id="overlayText">十关积分挑战，第一关累计达到 5,000 分。连续合成还能连击加分，轻点放下水果开始吧！</p><button class="primary-button" id="overlayButton"><svg viewBox="0 0 24 24"><path d="M7 4.8a1 1 0 0 1 1.5-.86l12 7.2a1 1 0 0 1 0 1.72l-12 7.2A1 1 0 0 1 7 19.2V4.8Z"/></svg><span id="overlayButtonText">开始合成</span></button></div>
+            </div>
+          </div>
+        </div>
+        <div class="game-footer"><span class="footer-tip"><i></i><span>移动瞄准 · 点击 / 松开投放</span></span><button class="reset-link" id="restartButton">重新开始 ↗</button></div>
+        <div class="screen-reader" id="announcement" aria-live="polite"></div>
+      </section>
+    </main>
+  </div>
+  <script>
+    (() => {
+      'use strict';
+
+      const WIDTH = 420;
+      const HEIGHT = 570;
+      const FLOOR = 565;
+      const DANGER_Y = 91;
+      const FRUITS = [
+        {name:'小樱桃', r:17, color:'#dc5768', light:'#f79095'},
+        {name:'草莓', r:23, color:'#ee736e', light:'#ffc29c'},
+        {name:'葡萄', r:29, color:'#9e79bc', light:'#c5a3df'},
+        {name:'小橘子', r:36, color:'#f3a452', light:'#ffd080'},
+        {name:'柠檬', r:44, color:'#eec55d', light:'#ffe997'},
+        {name:'猕猴桃', r:53, color:'#86b777', light:'#bedb92'},
+        {name:'红苹果', r:63, color:'#e76964', light:'#ffa290'},
+        {name:'水蜜桃', r:74, color:'#f0a7a0', light:'#ffd0b0'},
+        {name:'菠萝', r:86, color:'#dfa963', light:'#f8d889'},
+        {name:'哈密瓜', r:99, color:'#a8c87e', light:'#dbeba1'},
+        {name:'大西瓜', r:112, color:'#57a87c', light:'#9dd49a'}
+      ];
+      const STAGES = [
+        {name:'果园初体验', targetScore:5000, pool:[0,0,1,1,2]},
+        {name:'酸甜时光', targetScore:10000, pool:[0,1,1,2,2,3]},
+        {name:'丰收物语', targetScore:20000, pool:[1,2,2,3,3,4]},
+        {name:'盛夏果篮', targetScore:40000, pool:[2,2,3,3,4,5]},
+        {name:'缤纷果宴', targetScore:80000, pool:[2,3,3,4,4,5]},
+        {name:'甜蜜连连', targetScore:160000, pool:[3,3,4,4,5]},
+        {name:'金色丰收', targetScore:320000, pool:[3,4,4,5,5]},
+        {name:'瓜田奇遇', targetScore:640000, pool:[3,4,5,5,6]},
+        {name:'果园传奇', targetScore:1280000, pool:[4,4,5,5,6]},
+        {name:'西瓜终章', targetScore:2560000, pool:[4,5,5,6,6]}
+      ];
+
+      const Rules = {
+        clampX(x, radius, width) { return Math.max(radius, Math.min(width - radius, x)); },
+        canMerge(first, second) { return first.level === second.level; },
+        mergeLevel(level) { return level < 10 ? level + 1 : null; },
+        mergePoints(level) { return (level + 1) * (level + 1) * 10; },
+        shouldMerge(first, second) { return this.canMerge(first, second) && Math.hypot(first.x-second.x, first.y-second.y) <= first.r + second.r + 2.25; },
+        touching(first, second) { return Math.hypot(first.x - second.x, first.y - second.y) < first.r + second.r; }
+      };
+
+      const board = document.getElementById('board');
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      const nextCanvas = document.getElementById('nextCanvas');
+      const nextCtx = nextCanvas.getContext('2d');
+      const scoreLabel = document.getElementById('score');
+      const bestLabel = document.getElementById('best');
+      const overlay = document.getElementById('overlay');
+      const overlayTitle = document.getElementById('overlayTitle');
+      const overlayText = document.getElementById('overlayText');
+      const overlayButton = document.getElementById('overlayButton');
+      const overlayButtonText = document.getElementById('overlayButtonText');
+      const pauseButton = document.getElementById('pauseButton');
+      const pauseIcon = document.getElementById('pauseIcon');
+      const soundButton = document.getElementById('soundButton');
+      const soundWave = document.getElementById('soundWave');
+      const announcement = document.getElementById('announcement');
+      const missionNumber = document.getElementById('missionNumber');
+      const missionTitle = document.getElementById('missionTitle');
+      const missionTarget = document.getElementById('missionTarget');
+      const missionFill = document.getElementById('missionFill');
+      const comboBadge = document.getElementById('comboBadge');
+      const boardCorner = document.getElementById('boardCorner');
+      const storageKey = 'fruit-lab-best-v1';
+
+      let fruits = [];
+      let particles = [];
+      let popups = [];
+      let score = 0;
+      let best = 0;
+      let state = 'ready';
+      let aimX = WIDTH / 2;
+      let currentLevel = 0;
+      let nextLevel = 1;
+      let cooldown = 0;
+      let dangerTime = 0;
+      let elapsed = 0;
+      let muted = false;
+      let audioContext = null;
+      let lastFrame = 0;
+      let accumulator = 0;
+      let pointerHeld = false;
+      let resting = false;
+      let restTime = 0;
+      let restAnchors = new Map();
+      let stageIndex = 0;
+      let clearedStageIndex = 0;
+      let combo = 0;
+      let lastMergeAt = -Infinity;
+
+      try { best = Number(localStorage.getItem(storageKey)) || 0; } catch (_) { best = 0; }
+      bestLabel.textContent = best.toLocaleString('zh-CN');
+
+      function randomLevel() {
+        const pool = STAGES[Math.min(stageIndex, STAGES.length - 1)].pool;
+        return pool[Math.floor(Math.random() * pool.length)];
+      }
+
+      function addScore(points) {
+        score += points;
+        scoreLabel.textContent = score.toLocaleString('zh-CN');
+        if (score > best) {
+          best = score;
+          bestLabel.textContent = best.toLocaleString('zh-CN');
+          try { localStorage.setItem(storageKey, String(best)); } catch (_) { }
+        }
+      }
+
+      function updateMission() {
+        const stage = STAGES[stageIndex];
+        const previousTarget = stageIndex ? STAGES[stageIndex - 1].targetScore : 0;
+        missionNumber.textContent = stage ? `第 ${stageIndex + 1} / ${STAGES.length} 关` : '通关成功 · 无尽模式';
+        missionTitle.textContent = stage ? stage.name : '无尽模式 · 西瓜大师';
+        missionTarget.textContent = stage ? `目标 · 累计 ${stage.targetScore.toLocaleString('zh-CN')} 分` : '目标 · 冲刺最高分';
+        missionFill.style.width = `${stage ? Math.max(0, Math.min(100, (score - previousTarget) / (stage.targetScore - previousTarget) * 100)) : 100}%`;
+        comboBadge.hidden = combo < 2;
+        if (combo >= 2) comboBadge.textContent = `连击 ×${combo}`;
+        boardCorner.textContent = stage ? `FRUIT LAB · ${String(stageIndex + 1).padStart(2,'0')}` : 'FRUIT LAB · ∞';
+      }
+
+      function sound(frequency, duration = .11, type = 'sine') {
+        if (muted) return;
+        try {
+          audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
+          const oscillator = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          oscillator.type = type;
+          oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.38, audioContext.currentTime + duration);
+          gain.gain.setValueAtTime(.055, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(.001, audioContext.currentTime + duration);
+          oscillator.connect(gain).connect(audioContext.destination);
+          oscillator.start();
+          oscillator.stop(audioContext.currentTime + duration);
+        } catch (_) { }
+      }
+
+      function showOverlay(title, message, buttonText) {
+        overlayTitle.textContent = title;
+        overlayText.textContent = message;
+        overlayButtonText.textContent = buttonText;
+        overlay.hidden = false;
+        overlayButton.focus({preventScroll:true});
+      }
+
+      function updatePauseButton() {
+        const paused = state === 'paused';
+        pauseButton.setAttribute('aria-label', paused ? '继续游戏' : '暂停游戏');
+        pauseIcon.innerHTML = paused ? '<path d="m8 5 11 7-11 7V5Z"/>' : '<path d="M8 5v14M16 5v14"/>';
+      }
+
+      function resetGame() {
+        fruits = [];
+        particles = [];
+        popups = [];
+        score = 0;
+        elapsed = 0;
+        cooldown = 0;
+        dangerTime = 0;
+        resting = false;
+        restTime = 0;
+        restAnchors = new Map();
+        stageIndex = 0;
+        clearedStageIndex = 0;
+        combo = 0;
+        lastMergeAt = -Infinity;
+        aimX = WIDTH / 2;
+        currentLevel = randomLevel();
+        nextLevel = randomLevel();
+        scoreLabel.textContent = '0';
+        state = 'playing';
+        overlay.hidden = true;
+        updatePauseButton();
+        updateMission();
+        drawNext();
+        board.focus({preventScroll:true});
+        announcement.textContent = '第一关开始，累计获得 5,000 分。移动指针瞄准并投放水果。';
+      }
+
+      function nextStage() {
+        if (state !== 'stage-clear' && state !== 'complete') return;
+        while (clearedStageIndex < STAGES.length && score >= STAGES[clearedStageIndex].targetScore) clearedStageIndex++;
+        const stagesCleared = clearedStageIndex - stageIndex;
+        stageIndex = clearedStageIndex;
+        const highestDrop = Math.max(...STAGES[Math.min(stageIndex, STAGES.length - 1)].pool);
+        currentLevel = Math.min(currentLevel + stagesCleared, highestDrop);
+        nextLevel = Math.min(nextLevel + stagesCleared, highestDrop);
+        combo = 0;
+        lastMergeAt = -Infinity;
+        state = 'playing';
+        overlay.hidden = true;
+        updateMission();
+        drawNext();
+        board.focus({preventScroll:true});
+        announcement.textContent = stageIndex < STAGES.length ? `第 ${stageIndex + 1} 关开始，累计目标 ${STAGES[stageIndex].targetScore.toLocaleString('zh-CN')} 分。` : '全部通关，进入无尽挑战。';
+      }
+
+      function completeStage() {
+        clearedStageIndex = stageIndex;
+        while (clearedStageIndex < STAGES.length && score >= STAGES[clearedStageIndex].targetScore) clearedStageIndex++;
+        const stagesCleared = clearedStageIndex - stageIndex;
+        const lastStage = clearedStageIndex === STAGES.length;
+        state = lastStage ? 'complete' : 'stage-clear';
+        const title = lastStage ? '西瓜大师，十关通关啦！' : stagesCleared > 1 ? `连过 ${stagesCleared} 关！` : `第 ${stageIndex + 1} 关完成！`;
+        const message = lastStage ? `累计 ${score.toLocaleString('zh-CN')} 分，十关全部完成！继续挑战最高纪录吧。` : `累计 ${score.toLocaleString('zh-CN')} 分，已达到第 ${clearedStageIndex} 关目标！下一关掉落水果升级。`;
+        showOverlay(title, message, lastStage ? '继续无尽挑战' : '进入下一关');
+        announcement.textContent = `${title} ${message}`;
+        sound(700, .22);
+      }
+
+      function pauseGame() {
+        if (state === 'playing') {
+          state = 'paused';
+          showOverlay('先歇一小会儿。', '水果们会乖乖等你，准备好了再继续。', '继续游戏');
+        } else if (state === 'paused') {
+          state = 'playing';
+          overlay.hidden = true;
+          board.focus({preventScroll:true});
+        }
+        updatePauseButton();
+      }
+
+      function gameOver() {
+        state = 'over';
+        sound(210, .28, 'triangle');
+        const progress = stageIndex < STAGES.length ? `闯到了第 ${stageIndex + 1} 关` : '完成了全部关卡';
+        showOverlay('果园装满啦！', `${progress}，收获 ${score.toLocaleString('zh-CN')} 分。再来挑战一次吧！`, '再玩一次');
+        announcement.textContent = `游戏结束，得分 ${score}。`;
+      }
+
+      function drop() {
+        if (state !== 'playing' || cooldown > 0) return;
+        resting = false;
+        restTime = 0;
+        restAnchors = new Map();
+        const radius = FRUITS[currentLevel].r;
+        aimX = Rules.clampX(aimX, radius + 2, WIDTH);
+        fruits.push({x:aimX, y:49, vx:0, vy:10, r:radius, level:currentLevel, born:elapsed, angle:(Math.random() - .5) * .15});
+        currentLevel = nextLevel;
+        nextLevel = randomLevel();
+        cooldown = .42;
+        drawNext();
+        sound(335, .09);
+      }
+
+      function createBurst(x, y, color, points) {
+        const count = matchMedia('(prefers-reduced-motion: reduce)').matches ? 3 : 11;
+        for (let index = 0; index < count; index++) {
+          const angle = Math.PI * 2 * index / count + Math.random() * .35;
+          const speed = 60 + Math.random() * 125;
+          particles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed-50,life:.55,maxLife:.55,r:2+Math.random()*3,color});
+        }
+        popups.push({x,y:y-10,text:`+${points}`,life:.9});
+      }
+
+      function merge(first, second) {
+        const level = first.level;
+        const newLevel = Rules.mergeLevel(level);
+        const x = Rules.clampX((first.x + second.x) / 2, newLevel === null ? 0 : FRUITS[newLevel].r, WIDTH);
+        const y = (first.y + second.y) / 2;
+        combo = elapsed - lastMergeAt <= 2.7 ? Math.min(combo + 1, 5) : 1;
+        lastMergeAt = elapsed;
+        const points = Rules.mergePoints(level) * combo;
+        addScore(points);
+        updateMission();
+        createBurst(x, y, FRUITS[level].color, points);
+        sound(330 + level * 55, .15);
+        if (newLevel !== null) {
+          const radius = FRUITS[newLevel].r;
+          const firstMass = first.r * first.r;
+          const secondMass = second.r * second.r;
+          const vx = (first.vx * firstMass + second.vx * secondMass) / (firstMass + secondMass) * .78;
+          fruits.push({x,y:Math.min(FLOOR-radius,Math.max(radius,y)),vx,vy:-175,r:radius,level:newLevel,born:elapsed,angle:(first.angle+second.angle)/2});
+          if (newLevel === 10) announcement.textContent = '太棒了，你合成了大西瓜！';
+        } else {
+          announcement.textContent = '完美！两个大西瓜合成，果园又有空间了。';
+        }
+        if (state === 'playing' && stageIndex < STAGES.length && score >= STAGES[stageIndex].targetScore) completeStage();
+      }
+
+      function mergeRestingPair() {
+        for (let firstIndex = 0; firstIndex < fruits.length; firstIndex++) {
+          for (let secondIndex = firstIndex + 1; secondIndex < fruits.length; secondIndex++) {
+            const first = fruits[firstIndex];
+            const second = fruits[secondIndex];
+            if (!Rules.shouldMerge(first, second)) continue;
+            fruits.splice(secondIndex, 1);
+            fruits.splice(firstIndex, 1);
+            resting = false;
+            restTime = 0;
+            restAnchors = new Map();
+            merge(first, second);
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function step(dt) {
+        elapsed += dt;
+        cooldown = Math.max(0, cooldown - dt);
+        if (resting && !mergeRestingPair()) { finishStep(dt); return; }
+        const removed = new Set();
+        const pairs = [];
+
+        for (const fruit of fruits) {
+          const grounded = fruit.y >= FLOOR - fruit.r - .5;
+          fruit.vy += 1450 * dt;
+          fruit.vx *= Math.exp((grounded ? -2.1 : -.4) * dt);
+          fruit.x += fruit.vx * dt;
+          fruit.y += fruit.vy * dt;
+          fruit.angle += fruit.vx / fruit.r * dt * .8;
+          if (fruit.x < fruit.r) { fruit.x = fruit.r; fruit.vx = Math.abs(fruit.vx) * .3; }
+          if (fruit.x > WIDTH - fruit.r) { fruit.x = WIDTH - fruit.r; fruit.vx = -Math.abs(fruit.vx) * .3; }
+          if (fruit.y > FLOOR - fruit.r) {
+            fruit.y = FLOOR - fruit.r;
+            fruit.vy = fruit.vy > 60 ? -fruit.vy * .19 : 0;
+          }
+        }
+
+        for (let pass = 0; pass < 5; pass++) {
+          for (let firstIndex = 0; firstIndex < fruits.length; firstIndex++) {
+            const first = fruits[firstIndex];
+            if (removed.has(first)) continue;
+            for (let secondIndex = firstIndex + 1; secondIndex < fruits.length; secondIndex++) {
+              const second = fruits[secondIndex];
+              if (removed.has(second)) continue;
+              const dx = second.x - first.x;
+              const dy = second.y - first.y;
+              const minDistance = first.r + second.r - 2;
+              const distanceSquared = dx*dx + dy*dy;
+              if (Rules.shouldMerge(first, second)) {
+                removed.add(first);
+                removed.add(second);
+                pairs.push([first, second]);
+                break;
+              }
+              if (distanceSquared >= minDistance*minDistance) continue;
+              const distance = Math.sqrt(distanceSquared) || .001;
+              const nx = distanceSquared === 0 ? 1 : dx / distance;
+              const ny = distanceSquared === 0 ? 0 : dy / distance;
+              const overlap = minDistance - distance;
+              const firstInverseMass = 1 / (first.r * first.r);
+              const secondInverseMass = 1 / (second.r * second.r);
+              const inverseMassSum = firstInverseMass + secondInverseMass;
+              const firstShare = firstInverseMass / inverseMassSum;
+              first.x -= nx * overlap * firstShare * .88;
+              first.y -= ny * overlap * firstShare * .88;
+              second.x += nx * overlap * (1-firstShare) * .88;
+              second.y += ny * overlap * (1-firstShare) * .88;
+              const relative = (second.vx-first.vx)*nx + (second.vy-first.vy)*ny;
+              if (relative < 0) {
+                const impulse = -(1 + .24) * relative / inverseMassSum;
+                first.vx -= nx * impulse * firstInverseMass;
+                first.vy -= ny * impulse * firstInverseMass;
+                second.vx += nx * impulse * secondInverseMass;
+                second.vy += ny * impulse * secondInverseMass;
+                const tangentX = -ny;
+                const tangentY = nx;
+                const tangentSpeed = (second.vx-first.vx)*tangentX + (second.vy-first.vy)*tangentY;
+                const friction = Math.max(-impulse * .16, Math.min(impulse * .16, -tangentSpeed / inverseMassSum));
+                first.vx -= tangentX * friction * firstInverseMass;
+                first.vy -= tangentY * friction * firstInverseMass;
+                second.vx += tangentX * friction * secondInverseMass;
+                second.vy += tangentY * friction * secondInverseMass;
+              }
+            }
+          }
+          for (const fruit of fruits) {
+            fruit.x = Rules.clampX(fruit.x, fruit.r, WIDTH);
+            if (fruit.y > FLOOR - fruit.r) { fruit.y = FLOOR - fruit.r; fruit.vy = Math.min(0, fruit.vy); }
+          }
+        }
+        if (pairs.length) {
+          fruits = fruits.filter(fruit => !removed.has(fruit));
+          for (const [first, second] of pairs) merge(first, second);
+        }
+        if (fruits.length) {
+          const steady = fruits.length === restAnchors.size && fruits.every(fruit => {
+            const anchor = restAnchors.get(fruit);
+            return anchor && Math.hypot(fruit.x-anchor.x, fruit.y-anchor.y) < 3;
+          });
+          if (steady) {
+            restTime += dt;
+            if (restTime > .75) {
+              resting = true;
+              for (const fruit of fruits) { fruit.vx = 0; fruit.vy = 0; }
+            }
+          } else {
+            restAnchors = new Map(fruits.map(fruit => [fruit, {x:fruit.x, y:fruit.y}]));
+            restTime = 0;
+          }
+        }
+
+        finishStep(dt);
+      }
+
+      function finishStep(dt) {
+        const endangered = fruits.some(fruit => elapsed - fruit.born > 1.5 && fruit.y - fruit.r < DANGER_Y && Math.abs(fruit.vy) < 100);
+        dangerTime = endangered ? dangerTime + dt : Math.max(0, dangerTime - dt * 2);
+        if (state === 'playing' && dangerTime > 2.4) gameOver();
+        if (combo && elapsed - lastMergeAt > 2.7) { combo = 0; updateMission(); }
+
+        for (const particle of particles) { particle.life -= dt; particle.x += particle.vx*dt; particle.y += particle.vy*dt; particle.vy += 270*dt; }
+        particles = particles.filter(particle => particle.life > 0);
+        for (const popup of popups) { popup.life -= dt; popup.y -= dt * 35; }
+        popups = popups.filter(popup => popup.life > 0);
+      }
+
+      function drawFruit(context, x, y, radius, level, angle = 0, alpha = 1) {
+        const fruit = FRUITS[level];
+        context.save();
+        context.globalAlpha = alpha;
+        context.translate(x,y);
+        context.rotate(angle);
+        context.shadowColor = 'rgba(94,70,52,.19)';
+        context.shadowBlur = 9;
+        context.shadowOffsetY = 4;
+        const gradient = context.createRadialGradient(-radius*.35,-radius*.48,radius*.08,0,0,radius*1.3);
+        gradient.addColorStop(0,fruit.light);
+        gradient.addColorStop(.67,fruit.color);
+        gradient.addColorStop(1,fruit.color);
+        context.fillStyle = gradient;
+        context.beginPath();context.arc(0,0,radius,0,Math.PI*2);context.fill();
+        context.shadowColor = 'transparent';context.shadowBlur = 0;context.shadowOffsetY = 0;
+        if (level === 10) {
+          context.strokeStyle = '#34805d'; context.lineWidth = Math.max(3,radius*.072);
+          for (let stripe = -2; stripe <= 2; stripe++) {
+            context.beginPath();
+            context.moveTo(stripe*radius*.32,-radius*.89);
+            context.bezierCurveTo(stripe*radius*.37-radius*.18,-radius*.34,stripe*radius*.38+radius*.18,radius*.4,stripe*radius*.32,radius*.86);
+            context.stroke();
+          }
+        } else if (level === 5 || level === 9) {
+          context.strokeStyle = 'rgba(255,255,255,.28)';context.lineWidth = Math.max(1,radius*.04);
+          for(let stripe = -1;stripe<=1;stripe++){context.beginPath();context.arc(0,0,radius*(.42+stripe*.2),.15,Math.PI-.15);context.stroke();}
+        } else if (level === 8) {
+          context.strokeStyle = 'rgba(124,100,52,.22)';context.lineWidth = Math.max(1,radius*.035);
+          for(let stripe=-2;stripe<=2;stripe++){context.beginPath();context.moveTo(-radius*.8,stripe*radius*.34-radius*.25);context.lineTo(radius*.8,stripe*radius*.34+radius*.25);context.stroke();}
+        }
+        context.fillStyle='rgba(255,255,255,.30)';context.beginPath();context.ellipse(-radius*.36,-radius*.48,radius*.24,radius*.12,-.55,0,Math.PI*2);context.fill();
+        if (radius >= 16) {
+          context.strokeStyle='#56714e';context.lineWidth=Math.max(2,radius*.055);context.lineCap='round';
+          context.beginPath();context.moveTo(0,-radius*.89);context.quadraticCurveTo(radius*.02,-radius*1.08,radius*.13,-radius*1.12);context.stroke();
+          context.fillStyle='#70a975';context.beginPath();context.ellipse(radius*.25,-radius*1.04,radius*.21,radius*.095,-.45,0,Math.PI*2);context.fill();
+        }
+        if (radius >= 13) {
+          const eyeY = radius*.05;
+          context.fillStyle = '#554552';
+          context.beginPath();context.arc(-radius*.23,eyeY,Math.max(1.8,radius*.048),0,Math.PI*2);context.arc(radius*.23,eyeY,Math.max(1.8,radius*.048),0,Math.PI*2);context.fill();
+          context.strokeStyle='#654a52';context.lineWidth=Math.max(1.5,radius*.035);context.lineCap='round';
+          context.beginPath();context.arc(0,radius*.13,radius*.11,.05,Math.PI-.05);context.stroke();
+          context.fillStyle='rgba(255,156,150,.52)';context.beginPath();context.arc(-radius*.41,radius*.18,radius*.09,0,Math.PI*2);context.arc(radius*.41,radius*.18,radius*.09,0,Math.PI*2);context.fill();
+        }
+        context.restore();
+      }
+
+      function drawNext() {
+        nextCtx.clearRect(0,0,86,86);
+        const radius = Math.min(FRUITS[nextLevel].r,28);
+        drawFruit(nextCtx,43,45,radius,nextLevel);
+        nextCanvas.setAttribute('aria-label',`下一颗水果：${FRUITS[nextLevel].name}`);
+      }
+
+      function draw() {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.save();
+        ctx.scale(2,2);
+
+        ctx.save();
+        ctx.setLineDash([5,7]);
+        ctx.strokeStyle = dangerTime ? `rgba(231,92,82,${Math.min(.9,.48+dangerTime*.22)})` : 'rgba(226,129,103,.38)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();ctx.moveTo(13,DANGER_Y);ctx.lineTo(WIDTH-13,DANGER_Y);ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = dangerTime ? '#d4665b' : '#c29c88';
+        ctx.font = 'bold 10px system-ui';
+        ctx.fillText('警戒线',14,DANGER_Y-10);
+
+        if(state==='playing' && cooldown <= 0){
+          const radius = FRUITS[currentLevel].r;
+          const x = Rules.clampX(aimX,radius+2,WIDTH);
+          ctx.save();ctx.strokeStyle='rgba(137,125,109,.24)';ctx.setLineDash([4,8]);ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(x,68);ctx.lineTo(x,HEIGHT-15);ctx.stroke();ctx.restore();
+          drawFruit(ctx,x,43,radius,currentLevel,0,.88);
+        }
+
+        for (const fruit of fruits) drawFruit(ctx,fruit.x,fruit.y,fruit.r,fruit.level,fruit.angle);
+        for (const particle of particles) {
+          ctx.globalAlpha=Math.max(0,particle.life/particle.maxLife);ctx.fillStyle=particle.color;
+          ctx.beginPath();ctx.arc(particle.x,particle.y,particle.r,0,Math.PI*2);ctx.fill();
+        }
+        ctx.globalAlpha=1;
+        ctx.textAlign='center';ctx.font='900 17px system-ui';
+        for(const popup of popups){ctx.globalAlpha=Math.max(0,popup.life/.9);ctx.fillStyle='#e17c60';ctx.fillText(popup.text,popup.x,popup.y);}
+        ctx.globalAlpha=1;ctx.textAlign='left';
+
+        ctx.fillStyle='rgba(199,149,112,.33)';ctx.fillRect(0,FLOOR,WIDTH,HEIGHT-FLOOR);
+        ctx.restore();
+      }
+
+      function frame(timestamp) {
+        if (!lastFrame) lastFrame=timestamp;
+        accumulator += Math.min((timestamp-lastFrame)/1000,.05);
+        lastFrame=timestamp;
+        if(state==='playing') {
+          let iterations=0;
+          while(accumulator>=1/60 && iterations<3){step(1/60);accumulator-=1/60;iterations++;if(state!=='playing')break;}
+        } else accumulator=0;
+        draw();
+        requestAnimationFrame(frame);
+      }
+
+      function pointerX(event) {
+        const bounds=board.getBoundingClientRect();
+        return Rules.clampX((event.clientX-bounds.left)/bounds.width*WIDTH,FRUITS[currentLevel].r+2,WIDTH);
+      }
+      board.addEventListener('pointermove', event => { if(state==='playing') aimX=pointerX(event); });
+      board.addEventListener('pointerdown', event => {
+        if(state!=='playing')return;
+        pointerHeld=true;
+        aimX=pointerX(event);
+        board.setPointerCapture(event.pointerId);
+      });
+      board.addEventListener('pointerup', event => {
+        if(!pointerHeld)return;
+        pointerHeld=false;
+        aimX=pointerX(event);
+        drop();
+      });
+      board.addEventListener('pointercancel', () => { pointerHeld=false; });
+      window.addEventListener('keydown', event => {
+        if(event.code==='KeyP' && (state==='playing'||state==='paused')){event.preventDefault();pauseGame();return;}
+        if(event.code==='KeyR'){event.preventDefault();resetGame();return;}
+        if(state!=='playing'||(document.activeElement!==board && document.activeElement!==document.body))return;
+        if(event.code==='ArrowLeft'||event.code==='ArrowRight'){
+          event.preventDefault();aimX=Rules.clampX(aimX+(event.code==='ArrowLeft'?-18:18),FRUITS[currentLevel].r+2,WIDTH);
+        }
+        if(event.code==='Space'){event.preventDefault();drop();}
+      });
+      overlayButton.addEventListener('click', () => { if(state==='paused')pauseGame();else if(state==='stage-clear'||state==='complete')nextStage();else resetGame(); });
+      pauseButton.addEventListener('click', pauseGame);
+      document.getElementById('restartButton').addEventListener('click', resetGame);
+      soundButton.addEventListener('click', () => {
+        muted=!muted;
+        soundButton.setAttribute('aria-label',muted?'开启音效':'关闭音效');
+        soundWave.style.display=muted?'none':'';
+        if(!muted)sound(490);
+      });
+      document.addEventListener('visibilitychange', () => { if(document.hidden && state==='playing')pauseGame(); });
+      drawNext();
+      updateMission();
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
