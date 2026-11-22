@@ -27,6 +27,9 @@ jobs:
       # vite base 是 './'，项目页和自定义域名都能直接用，不需要 --base
       - run: npm run build
       - uses: actions/configure-pages@v5
+        with:
+          # 首次部署时自动开启 Pages（需要 pages: write 权限）
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
